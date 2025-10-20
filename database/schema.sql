@@ -105,6 +105,13 @@ INSERT INTO categories (name, description) VALUES
 ('Technology', 'Computer science and technology books'),
 ('Biography', 'Life stories and memoirs');
 
+-- Add indexes for better performance
+CREATE INDEX idx_books_category ON books(category_id);
+CREATE INDEX idx_books_author ON books(author);
+CREATE INDEX idx_books_active_stock ON books(is_active, stock_quantity);
+CREATE INDEX idx_orders_user_status ON orders(user_id, status);
+CREATE INDEX idx_order_items_book ON order_items(book_id);
+
 -- Insert sample books
 INSERT INTO books (title, author, isbn, price, stock_quantity, category_id, description) VALUES
 ('The Great Gatsby', 'F. Scott Fitzgerald', '9780743273565', 12.99, 50, 1, 'A classic American novel'),
