@@ -1,0 +1,103 @@
+name: Amazon Q Developer Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  amazon-q-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Amazon Q Developer Code Review
+        uses: aws/amazon-q-developer-cli-action@v1
+        with:
+          # Amazon Q Developer will automatically review the PR
+          command: 'review'
+          pr-number: ${{ github.event.pull_request.number }}
+          repository: ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  auto-merge-on-approval:
+    needs: amazon-q-review
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Check Amazon Q Developer Review Status
+        id: check-review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: reviews } = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            // Check if Amazon Q Developer approved
+            const qReview = reviews.find(review => 
+              review.user.login === 'amazon-q-developer[bot]' && 
+              review.state === 'APPROVED'
+            );
+
+            const hasRequestedChanges = reviews.some(review => 
+              review.user.login === 'amazon-q-developer[bot]' && 
+              review.state === 'CHANGES_REQUESTED'
+            );
+
+            return {
+              approved: !!qReview,
+              hasIssues: hasRequestedChanges
+            };
+
+      - name: Auto-merge if Amazon Q approved
+        if: fromJSON(steps.check-review.outputs.result).approved && !fromJSON(steps.check-review.outputs.result).hasIssues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
+                commit_message: 'Automatically merged after Amazon Q Developer approval ✅',
+                merge_method: 'squash'
+              });
+              
+              console.log('✅ PR auto-merged after Amazon Q Developer approval!');
+            } catch (error) {
+              console.log('❌ Auto-merge failed:', error.message);
+            }
+
+      - name: Add approval comment
+        if: fromJSON(steps.check-review.outputs.result).approved
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🤖 **Amazon Q Developer Approved** ✅\n\nThis PR has been reviewed and approved by Amazon Q Developer. Auto-merging now...'
+            });
+
+      - name: Block merge if issues found
+        if: fromJSON(steps.check-review.outputs.result).hasIssues
+        run: |
+          echo "❌ Amazon Q Developer found issues. Merge blocked until resolved."
+          exit 1
