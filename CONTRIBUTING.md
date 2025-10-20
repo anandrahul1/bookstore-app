@@ -2,38 +2,42 @@
 
 ## 🤖 Amazon Q Developer PR Review Process
 
-This repository uses **Amazon Q Developer** as an automated code reviewer. Here's how it works:
+This repository uses the **official Amazon Q Developer GitHub App** as an automated code reviewer. Here's how it works:
 
 ### How It Works
 
 1. **Create a Pull Request** - Any commit to a feature branch
-2. **Amazon Q Reviews** - Automatically analyzes your code for:
-   - 🔒 Security vulnerabilities
-   - 🎯 Code quality issues  
-   - 📝 Best practices compliance
-   - 🚨 Error handling patterns
+2. **Amazon Q Developer Reviews** - The official AI agent automatically analyzes your code for:
+   - 🔒 Security vulnerabilities (hardcoded secrets, SQL injection, XSS)
+   - 🎯 Code quality issues (best practices, maintainability)
+   - 📝 Performance and optimization opportunities
+   - 🚨 Error handling and reliability patterns
 
 3. **Automated Decision**:
-   - ✅ **Approved**: PR auto-merges if no issues found
-   - ❌ **Rejected**: PR blocked until issues are fixed
+   - ✅ **Approved**: PR auto-merges if Amazon Q Developer approves
+   - ❌ **Rejected**: PR blocked until Amazon Q Developer's issues are resolved
 
-### What Amazon Q Checks
+### What Amazon Q Developer Checks
 
-#### Security Issues (HIGH Priority)
-- Hardcoded passwords/secrets
+#### Security Issues (CRITICAL/HIGH Priority)
+- Hardcoded passwords, API keys, and secrets
 - SQL injection vulnerabilities
+- Cross-site scripting (XSS) risks
 - Insecure authentication patterns
+- Vulnerable dependencies
 
 #### Code Quality (MEDIUM Priority)
-- Use of `var` instead of `const/let`
-- Loose equality (`==`) instead of strict (`===`)
-- Missing error handling for async operations
-- Console.log in production services
+- Coding best practices and standards
+- Error handling completeness
+- Performance optimization opportunities
+- Code maintainability and readability
+- Proper logging and monitoring
 
-#### Best Practices (LOW Priority)
-- Proper logging frameworks
-- Environment variable usage
-- Code formatting standards
+#### Architecture Compliance (LOW Priority)
+- Microservices isolation principles
+- Proper service boundaries
+- Configuration management
+- Database access patterns
 
 ### Development Workflow
 

@@ -1,0 +1,94 @@
+# Amazon Q Developer Configuration
+# This file configures Amazon Q Developer for automated code reviews
+
+# Review settings
+review:
+  # Enable automatic code review on PRs
+  enabled: true
+  
+  # Review scope
+  files:
+    - "**/*.js"
+    - "**/*.ts"
+    - "**/*.jsx"
+    - "**/*.tsx"
+    - "**/*.json"
+    - "**/*.yml"
+    - "**/*.yaml"
+    - "**/*.sql"
+    - "**/*.md"
+  
+  # Exclude certain files/directories
+  exclude:
+    - "node_modules/**"
+    - "dist/**"
+    - "build/**"
+    - "*.min.js"
+    - "package-lock.json"
+
+# Security scanning
+security:
+  enabled: true
+  severity_threshold: "medium"  # Block PRs with medium+ security issues
+  
+  # Security checks to perform
+  checks:
+    - hardcoded_secrets
+    - sql_injection
+    - xss_vulnerabilities
+    - insecure_dependencies
+    - authentication_issues
+
+# Code quality settings
+quality:
+  enabled: true
+  
+  # Quality checks
+  checks:
+    - code_style
+    - best_practices
+    - error_handling
+    - performance
+    - maintainability
+  
+  # Minimum quality score (0-100)
+  min_score: 75
+
+# Auto-merge settings
+auto_merge:
+  enabled: true
+  
+  # Conditions for auto-merge
+  conditions:
+    - amazon_q_approved: true
+    - no_security_issues: true
+    - quality_score_above: 75
+    - no_failing_tests: true
+
+# Notification settings
+notifications:
+  # Comment on PR with review results
+  pr_comments: true
+  
+  # Mention specific users for certain issues
+  mentions:
+    security_issues: ["@anandrahul1"]
+    quality_issues: []
+
+# Custom rules for this repository
+custom_rules:
+  # Microservices specific rules
+  - name: "Service isolation"
+    description: "Ensure services don't directly import from other services"
+    pattern: "services/*/.*require.*services/"
+    severity: "high"
+  
+  - name: "Environment variables"
+    description: "Ensure sensitive data uses environment variables"
+    pattern: "(password|secret|key).*=.*['\"][^'\"]*['\"]"
+    severity: "critical"
+  
+  - name: "Database queries"
+    description: "Ensure parameterized queries are used"
+    pattern: "SELECT.*\\+.*"
+    severity: "high"
