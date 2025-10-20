@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Bookstore Microservices - Technical Architecture Document</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #232F3E;
+            text-align: center;
+            border-bottom: 3px solid #FF9900;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #232F3E;
+            border-left: 4px solid #FF9900;
+            padding-left: 15px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #146EB4;
+            margin-top: 25px;
+        }
+        .architecture-diagram {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .service-box {
+            display: inline-block;
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 5px;
+            min-width: 120px;
+            text-align: center;
+        }
+        .database-box {
+            background: #fff3e0;
+            border: 2px solid #ff9800;
+        }
+        .aws-service {
+            background: #e8f5e8;
+            border: 2px solid #4caf50;
+        }
+        .flow-arrow {
+            font-size: 20px;
+            color: #666;
+            margin: 0 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #232F3E;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .cost-table {
+            background: #fff8e1;
+        }
+        .security-highlight {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .er-diagram {
+            background: #f0f8ff;
+            border: 2px solid #4682b4;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Online Bookstore Microservices Application<br>Technical Architecture Document (TAD)</h1>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <strong>AWS EKS Deployment with Production-Ready Architecture</strong><br>
+            <em>Document Version: 1.0 | Date: October 2025</em>
+        </div>
+
+        <h2>1. Executive Summary</h2>
+        <p>This Technical Architecture Document outlines the design and implementation of a cloud-native Online Bookstore application using microservices architecture deployed on Amazon EKS. The solution provides high availability, scalability, and security following AWS Well-Architected Framework principles.</p>
+
+        <h2>2. Architecture Overview</h2>
+        <div class="architecture-diagram">
+            <h3>High-Level Architecture Diagram</h3>
+            <div style="margin: 20px 0;">
+                <div class="service-box aws-service">Internet Gateway</div>
+                <div class="flow-arrow">↓</div><br>
+                <div class="service-box aws-service">Application Load Balancer</div>
+                <div class="flow-arrow">↓</div><br>
+                <div class="service-box aws-service">AWS WAF</div>
+                <div class="flow-arrow">↓</div><br>
+                <div style="border: 3px dashed #ff9800; padding: 20px; margin: 10px; border-radius: 10px;">
+                    <strong>Amazon EKS Cluster (Multi-AZ)</strong><br><br>
+                    <div class="service-box">UI Service<br>(Node.js + Express)</div>
+                    <div class="service-box">Catalog Service<br>(Node.js + Express)</div>
+                    <div class="service-box">Cart Service<br>(Node.js + Express)</div><br>
+                    <div class="service-box">Order Service<br>(Node.js + Express)</div>
+                    <div class="service-box">Payment Service<br>(Node.js + Express)</div>
+                    <div class="service-box">User Service<br>(Node.js + Express)</div><br>
+                    <div class="service-box">AI Chatbot Service<br>(Node.js + Bedrock Nova)</div>
+                </div>
+                <div class="flow-arrow">↓</div><br>
+                <div class="service-box aws-service">AWS Cognito</div>
+                <div class="service-box database-box">RDS MySQL<br>(Multi-AZ for Prod)</div>
+                <div class="service-box aws-service">Amazon Bedrock<br>(Nova Model)</div>
+            </div>
+        </div>
+
+        <h2>3. Service Architecture Details</h2>
+        
+        <h3>3.1 Microservices Components</h3>
+        <table>
+            <tr>
+                <th>Service</th>
+                <th>Technology</th>
+                <th>Purpose</th>
+                <th>Dependencies</th>
+            </tr>
+            <tr>
+                <td>UI Service</td>
+                <td>Node.js + Express</td>
+                <td>Frontend web interface serving HTML5, CSS3, JavaScript</td>
+                <td>AWS Cognito, All Backend Services</td>
+            </tr>
+            <tr>
+                <td>Catalog Service</td>
+                <td>Node.js + Express</td>
+                <td>Book catalog management, search, and browsing</td>
+                <td>RDS MySQL</td>
+            </tr>
+            <tr>
+                <td>Cart Service</td>
+                <td>Node.js + Express</td>
+                <td>Shopping cart management and session handling</td>
+                <td>RDS MySQL, User Service</td>
+            </tr>
+            <tr>
+                <td>Order Service</td>
+                <td>Node.js + Express</td>
+                <td>Order processing and management</td>
+                <td>RDS MySQL, Payment Service, Cart Service</td>
+            </tr>
+            <tr>
+                <td>Payment Service</td>
+                <td>Node.js + Express</td>
+                <td>Payment processing and transaction management</td>
+                <td>RDS MySQL, External Payment Gateway</td>
+            </tr>
+            <tr>
+                <td>User Service</td>
+                <td>Node.js + Express</td>
+                <td>User profile and account management</td>
+                <td>AWS Cognito, RDS MySQL</td>
+            </tr>
+            <tr>
+                <td>AI Chatbot Service</td>
+                <td>Node.js + Bedrock Nova</td>
+                <td>AI-powered customer support and recommendations</td>
+                <td>Amazon Bedrock Nova, Catalog Service</td>
+            </tr>
+        </table>
+
+        <h2>4. Database Design</h2>
+        <div class="er-diagram">
+            <h3>Entity Relationship Diagram</h3>
+            <pre style="font-family: monospace; background: white; padding: 15px; border-radius: 5px;">
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│     USERS       │    │     BOOKS       │    │    ORDERS       │
+├─────────────────┤    ├─────────────────┤    ├─────────────────┤
+│ user_id (PK)    │    │ book_id (PK)    │    │ order_id (PK)   │
+│ cognito_id      │    │ title           │    │ user_id (FK)    │
+│ email           │    │ author          │    │ total_amount    │
+│ first_name      │    │ isbn            │    │ status          │
+│ last_name       │    │ price           │    │ created_at      │
+│ created_at      │    │ stock_quantity  │    │ updated_at      │
+│ updated_at      │    │ category_id(FK) │    └─────────────────┘
+└─────────────────┘    │ description     │           │
+         │              │ created_at      │           │
+         │              └─────────────────┘           │
+         │                       │                    │
+         │                       │                    │
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   CART_ITEMS    │    │   CATEGORIES    │    │  ORDER_ITEMS    │
+├─────────────────┤    ├─────────────────┤    ├─────────────────┤
+│ cart_id (PK)    │    │ category_id(PK) │    │ order_item_id(PK)│
+│ user_id (FK)    │    │ name            │    │ order_id (FK)   │
+│ book_id (FK)    │    │ description     │    │ book_id (FK)    │
+│ quantity        │    │ created_at      │    │ quantity        │
+│ created_at      │    └─────────────────┘    │ unit_price      │
+└─────────────────┘                           │ total_price     │
+                                              └─────────────────┘
+
+┌─────────────────┐    ┌─────────────────┐
+│    PAYMENTS     │    │   CHAT_LOGS     │
+├─────────────────┤    ├─────────────────┤
+│ payment_id (PK) │    │ chat_id (PK)    │
+│ order_id (FK)   │    │ user_id (FK)    │
+│ amount          │    │ message         │
+│ payment_method  │    │ response        │
+│ status          │    │ timestamp       │
+│ transaction_id  │    │ session_id      │
+│ created_at      │    └─────────────────┘
+└─────────────────┘
+            </pre>
+        </div>
+
+        <h2>5. Authentication & Security Architecture</h2>
+        <div class="security-highlight">
+            <h3>5.1 Authentication Flow</h3>
+            <ol>
+                <li><strong>User Registration/Login</strong> → AWS Cognito User Pool</li>
+                <li><strong>Token Generation</strong> → JWT tokens issued by Cognito</li>
+                <li><strong>API Gateway</strong> → Token validation at ALB level</li>
+                <li><strong>Service Communication</strong> → Internal service mesh with mTLS</li>
+                <li><strong>Database Access</strong> → IAM database authentication</li>
+            </ol>
+        </div>
+
+        <h3>5.2 Security Best Practices Implementation</h3>
+        <table>
+            <tr>
+                <th>Security Layer</th>
+                <th>Implementation</th>
+                <th>AWS Service</th>
+            </tr>
+            <tr>
+                <td>Network Security</td>
+                <td>VPC with private subnets, NACLs, Security Groups</td>
+                <td>Amazon VPC</td>
+            </tr>
+            <tr>
+                <td>Web Application Firewall</td>
+                <td>SQL injection, XSS protection, rate limiting</td>
+                <td>AWS WAF</td>
+            </tr>
+            <tr>
+                <td>Identity & Access</td>
+                <td>Multi-factor authentication, OAuth 2.0/OIDC</td>
+                <td>AWS Cognito</td>
+            </tr>
+            <tr>
+                <td>Data Encryption</td>
+                <td>Encryption at rest and in transit</td>
+                <td>AWS KMS</td>
+            </tr>
+            <tr>
+                <td>Container Security</td>
+                <td>Image scanning, runtime security</td>
+                <td>Amazon ECR, AWS Security Hub</td>
+            </tr>
+            <tr>
+                <td>Secrets Management</td>
+                <td>Database credentials, API keys</td>
+                <td>AWS Secrets Manager</td>
+            </tr>
+        </table>
+
+        <h2>6. Cost Analysis</h2>
+        <div class="warning">
+            <strong>Note:</strong> All pricing is based on actual AWS pricing as of October 2025 for US East (N. Virginia) region.
+        </div>
+
+        <h3>6.1 Infrastructure Costs (Monthly)</h3>
+        <table class="cost-table">
+            <tr>
+                <th>Environment</th>
+                <th>Component</th>
+                <th>Instance Type</th>
+                <th>Quantity</th>
+                <th>Hours/Month</th>
+                <th>Unit Price</th>
+                <th>Monthly Cost</th>
+            </tr>
+            <tr style="background-color: #e8f5e8;">
+                <td rowspan="4"><strong>DEV</strong></td>
+                <td>EKS Worker Nodes</td>
+                <td>t3.medium</td>
+                <td>2</td>
+                <td>730</td>
+                <td>$0.0416/hr</td>
+                <td>$60.74</td>
+            </tr>
+            <tr style="background-color: #e8f5e8;">
+                <td>RDS MySQL</td>
+                <td>db.t3.medium (Single-AZ)</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.068/hr</td>
+                <td>$49.64</td>
+            </tr>
+            <tr style="background-color: #e8f5e8;">
+                <td>EKS Control Plane</td>
+                <td>Managed</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.10/hr</td>
+                <td>$73.00</td>
+            </tr>
+            <tr style="background-color: #e8f5e8;">
+                <td colspan="5"><strong>DEV Total</strong></td>
+                <td><strong>$183.38</strong></td>
+            </tr>
+            <tr style="background-color: #fff3e0;">
+                <td rowspan="4"><strong>QA</strong></td>
+                <td>EKS Worker Nodes</td>
+                <td>t3.medium</td>
+                <td>2</td>
+                <td>730</td>
+                <td>$0.0416/hr</td>
+                <td>$60.74</td>
+            </tr>
+            <tr style="background-color: #fff3e0;">
+                <td>RDS MySQL</td>
+                <td>db.t3.medium (Single-AZ)</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.068/hr</td>
+                <td>$49.64</td>
+            </tr>
+            <tr style="background-color: #fff3e0;">
+                <td>EKS Control Plane</td>
+                <td>Managed</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.10/hr</td>
+                <td>$73.00</td>
+            </tr>
+            <tr style="background-color: #fff3e0;">
+                <td colspan="5"><strong>QA Total</strong></td>
+                <td><strong>$183.38</strong></td>
+            </tr>
+            <tr style="background-color: #ffebee;">
+                <td rowspan="5"><strong>PROD (HA)</strong></td>
+                <td>EKS Worker Nodes</td>
+                <td>t3.medium</td>
+                <td>6 (Multi-AZ)</td>
+                <td>730</td>
+                <td>$0.0416/hr</td>
+                <td>$182.21</td>
+            </tr>
+            <tr style="background-color: #ffebee;">
+                <td>RDS MySQL</td>
+                <td>db.t3.medium (Multi-AZ)</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.136/hr</td>
+                <td>$99.28</td>
+            </tr>
+            <tr style="background-color: #ffebee;">
+                <td>EKS Control Plane</td>
+                <td>Managed</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.10/hr</td>
+                <td>$73.00</td>
+            </tr>
+            <tr style="background-color: #ffebee;">
+                <td>Application Load Balancer</td>
+                <td>ALB</td>
+                <td>1</td>
+                <td>730</td>
+                <td>$0.0225/hr</td>
+                <td>$16.43</td>
+            </tr>
+            <tr style="background-color: #ffebee;">
+                <td colspan="5"><strong>PROD Total</strong></td>
+                <td><strong>$370.92</strong></td>
+            </tr>
+        </table>
+
+        <h3>6.2 Additional AWS Services (Monthly)</h3>
+        <table class="cost-table">
+            <tr>
+                <th>Service</th>
+                <th>Usage</th>
+                <th>Cost per Environment</th>
+            </tr>
+            <tr>
+                <td>AWS Cognito</td>
+                <td>Up to 50,000 MAU</td>
+                <td>Free Tier</td>
+            </tr>
+            <tr>
+                <td>Amazon Bedrock (Nova)</td>
+                <td>1M input tokens, 500K output tokens</td>
+                <td>~$25.00</td>
+            </tr>
+            <tr>
+                <td>AWS WAF</td>
+                <td>Basic rules</td>
+                <td>$5.00</td>
+            </tr>
+            <tr>
+                <td>CloudWatch Logs</td>
+                <td>10GB ingestion</td>
+                <td>$5.00</td>
+            </tr>
+            <tr>
+                <td>ECR Repository</td>
+                <td>10GB storage</td>
+                <td>$1.00</td>
+            </tr>
+        </table>
+
+        <h3>6.3 Total Cost Summary</h3>
+        <table class="cost-table">
+            <tr>
+                <th>Environment</th>
+                <th>Infrastructure</th>
+                <th>Additional Services</th>
+                <th>Total Monthly Cost</th>
+                <th>Annual Cost</th>
+            </tr>
+            <tr>
+                <td><strong>DEV</strong></td>
+                <td>$183.38</td>
+                <td>$36.00</td>
+                <td><strong>$219.38</strong></td>
+                <td><strong>$2,632.56</strong></td>
+            </tr>
+            <tr>
+                <td><strong>QA</strong></td>
+                <td>$183.38</td>
+                <td>$36.00</td>
+                <td><strong>$219.38</strong></td>
+                <td><strong>$2,632.56</strong></td>
+            </tr>
+            <tr>
+                <td><strong>PROD</strong></td>
+                <td>$370.92</td>
+                <td>$36.00</td>
+                <td><strong>$406.92</strong></td>
+                <td><strong>$4,883.04</strong></td>
+            </tr>
+            <tr style="background-color: #232F3E; color: white;">
+                <td><strong>TOTAL</strong></td>
+                <td><strong>$737.68</strong></td>
+                <td><strong>$108.00</strong></td>
+                <td><strong>$845.68</strong></td>
+                <td><strong>$10,148.16</strong></td>
+            </tr>
+        </table>
+
+        <h2>7. High Availability & Disaster Recovery</h2>
+        <h3>7.1 Production Environment HA Design</h3>
+        <ul>
+            <li><strong>Multi-AZ Deployment:</strong> EKS worker nodes distributed across 3 availability zones</li>
+            <li><strong>Database HA:</strong> RDS MySQL Multi-AZ with automatic failover</li>
+            <li><strong>Load Balancing:</strong> Application Load Balancer with health checks</li>
+            <li><strong>Auto Scaling:</strong> Horizontal Pod Autoscaler and Cluster Autoscaler</li>
+            <li><strong>Backup Strategy:</strong> Automated RDS backups with 7-day retention</li>
+        </ul>
+
+        <h2>8. Monitoring & Observability</h2>
+        <table>
+            <tr>
+                <th>Component</th>
+                <th>Monitoring Tool</th>
+                <th>Metrics</th>
+            </tr>
+            <tr>
+                <td>Application Metrics</td>
+                <td>CloudWatch Container Insights</td>
+                <td>CPU, Memory, Network, Custom metrics</td>
+            </tr>
+            <tr>
+                <td>Database Monitoring</td>
+                <td>RDS Performance Insights</td>
+                <td>Query performance, Connection metrics</td>
+            </tr>
+            <tr>
+                <td>Application Logs</td>
+                <td>CloudWatch Logs</td>
+                <td>Application logs, Error tracking</td>
+            </tr>
+            <tr>
+                <td>Infrastructure</td>
+                <td>AWS X-Ray</td>
+                <td>Distributed tracing, Service map</td>
+            </tr>
+        </table>
+
+        <h2>9. Deployment Strategy</h2>
+        <h3>9.1 CI/CD Pipeline</h3>
+        <ol>
+            <li><strong>Source Control:</strong> Git repository with feature branches</li>
+            <li><strong>Build:</strong> AWS CodeBuild for containerization</li>
+            <li><strong>Registry:</strong> Amazon ECR for container images</li>
+            <li><strong>Deployment:</strong> AWS CodePipeline with GitOps using ArgoCD</li>
+            <li><strong>Testing:</strong> Automated testing in QA environment</li>
+            <li><strong>Production:</strong> Blue-Green deployment strategy</li>
+        </ol>
+
+        <h2>10. Compliance & Governance</h2>
+        <div class="security-highlight">
+            <h3>10.1 AWS Well-Architected Framework Alignment</h3>
+            <ul>
+                <li><strong>Operational Excellence:</strong> Infrastructure as Code, Automated deployments</li>
+                <li><strong>Security:</strong> Defense in depth, Encryption, IAM best practices</li>
+                <li><strong>Reliability:</strong> Multi-AZ deployment, Auto-scaling, Health checks</li>
+                <li><strong>Performance Efficiency:</strong> Right-sizing, Caching, CDN</li>
+                <li><strong>Cost Optimization:</strong> Reserved instances, Auto-scaling, Resource tagging</li>
+            </ul>
+        </div>
+
+        <h2>11. Implementation Roadmap</h2>
+        <table>
+            <tr>
+                <th>Phase</th>
+                <th>Duration</th>
+                <th>Deliverables</th>
+            </tr>
+            <tr>
+                <td>Phase 1: Foundation</td>
+                <td>2 weeks</td>
+                <td>VPC, EKS cluster, RDS setup</td>
+            </tr>
+            <tr>
+                <td>Phase 2: Core Services</td>
+                <td>4 weeks</td>
+                <td>Catalog, Cart, User services</td>
+            </tr>
+            <tr>
+                <td>Phase 3: Business Logic</td>
+                <td>3 weeks</td>
+                <td>Order, Payment services</td>
+            </tr>
+            <tr>
+                <td>Phase 4: AI Integration</td>
+                <td>2 weeks</td>
+                <td>Chatbot service with Bedrock</td>
+            </tr>
+            <tr>
+                <td>Phase 5: Production</td>
+                <td>2 weeks</td>
+                <td>HA setup, monitoring, go-live</td>
+            </tr>
+        </table>
+
+        <div style="margin-top: 40px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+            <h3>Document Information</h3>
+            <p><strong>Created by:</strong> AWS Solutions Architect<br>
+            <strong>Last Updated:</strong> October 2025<br>
+            <strong>Version:</strong> 1.0<br>
+            <strong>Review Cycle:</strong> Quarterly</p>
+        </div>
+    </div>
+</body>
+</html>

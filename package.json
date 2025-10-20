@@ -1,0 +1,25 @@
+{
+  "name": "online-bookstore",
+  "version": "1.0.0",
+  "description": "Microservices-based online bookstore application",
+  "scripts": {
+    "start:ui": "cd services/ui-service && npm start",
+    "start:catalog": "cd services/catalog-service && npm start",
+    "start:cart": "cd services/cart-service && npm start",
+    "start:order": "cd services/order-service && npm start",
+    "start:payment": "cd services/payment-service && npm start",
+    "start:user": "cd services/user-service && npm start",
+    "start:chatbot": "cd services/chatbot-service && npm start",
+    "install:all": "npm run install:ui && npm run install:catalog && npm run install:cart && npm run install:order && npm run install:payment && npm run install:user && npm run install:chatbot",
+    "install:ui": "cd services/ui-service && npm install",
+    "install:catalog": "cd services/catalog-service && npm install",
+    "install:cart": "cd services/cart-service && npm install",
+    "install:order": "cd services/order-service && npm install",
+    "install:payment": "cd services/payment-service && npm install",
+    "install:user": "cd services/user-service && npm install",
+    "install:chatbot": "cd services/chatbot-service && npm install"
+  },
+  "keywords": ["microservices", "bookstore", "nodejs", "aws", "eks"],
+  "author": "Your Team",
+  "license": "MIT"
+}
