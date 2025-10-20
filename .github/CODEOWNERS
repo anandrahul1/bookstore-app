@@ -1,0 +1,16 @@
+# Global code owners - Amazon Q will review all changes
+* @anandrahul1
+
+# Service-specific ownership
+/services/ui-service/ @anandrahul1
+/services/catalog-service/ @anandrahul1
+/services/cart-service/ @anandrahul1
+/services/order-service/ @anandrahul1
+/services/payment-service/ @anandrahul1
+/services/user-service/ @anandrahul1
+/services/chatbot-service/ @anandrahul1
+
+# Infrastructure and configuration
+/database/ @anandrahul1
+/.github/ @anandrahul1
+/docker-compose.yml @anandrahul1
