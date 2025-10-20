@@ -1,0 +1,213 @@
+# Amazon Q Developer Impact Analysis Configuration
+
+# Service Architecture Definition
+services:
+  ui-service:
+    name: "UI Service"
+    port: 3000
+    type: "frontend"
+    criticality: "HIGH"
+    dependencies:
+      - catalog-service
+      - cart-service  
+      - order-service
+      - user-service
+      - chatbot-service
+    consumers: []
+    
+  catalog-service:
+    name: "Catalog Service"
+    port: 3001
+    type: "core-api"
+    criticality: "HIGH"
+    dependencies:
+      - database
+    consumers:
+      - ui-service
+      - cart-service
+      - order-service
+      
+  cart-service:
+    name: "Cart Service"
+    port: 3002
+    type: "core-api"
+    criticality: "HIGH"
+    dependencies:
+      - database
+      - catalog-service
+      - user-service
+    consumers:
+      - ui-service
+      - order-service
+      
+  order-service:
+    name: "Order Service"
+    port: 3003
+    type: "business-logic"
+    criticality: "CRITICAL"
+    dependencies:
+      - database
+      - cart-service
+      - payment-service
+      - catalog-service
+    consumers:
+      - ui-service
+      
+  payment-service:
+    name: "Payment Service"
+    port: 3004
+    type: "financial"
+    criticality: "CRITICAL"
+    dependencies:
+      - database
+    consumers:
+      - order-service
+      
+  user-service:
+    name: "User Service"
+    port: 3005
+    type: "identity"
+    criticality: "HIGH"
+    dependencies:
+      - database
+      - cognito
+    consumers:
+      - ui-service
+      - cart-service
+      - order-service
+      
+  chatbot-service:
+    name: "Chatbot Service"
+    port: 3006
+    type: "support"
+    criticality: "MEDIUM"
+    dependencies:
+      - database
+    consumers:
+      - ui-service
+
+# Impact Analysis Rules
+impact_rules:
+  # File pattern based rules
+  file_patterns:
+    "services/*/package.json":
+      impact_type: "dependency_change"
+      risk_level: "MEDIUM"
+      requires_testing: ["unit", "integration"]
+      
+    "services/*/server.js":
+      impact_type: "core_logic_change"
+      risk_level: "HIGH"
+      requires_testing: ["unit", "integration", "e2e"]
+      
+    "database/*.sql":
+      impact_type: "database_schema"
+      risk_level: "CRITICAL"
+      affects_all_services: true
+      requires_testing: ["migration", "integration", "e2e"]
+      
+    "shared/**/*":
+      impact_type: "shared_dependency"
+      risk_level: "HIGH"
+      affects_all_services: true
+      requires_testing: ["unit", "integration"]
+      
+    ".github/workflows/*":
+      impact_type: "ci_cd_change"
+      risk_level: "MEDIUM"
+      requires_testing: ["pipeline"]
+
+  # Change type rules
+  change_types:
+    api_breaking:
+      risk_level: "CRITICAL"
+      notification_required: true
+      deployment_window: "maintenance"
+      
+    api_compatible:
+      risk_level: "MEDIUM"
+      deployment_window: "normal"
+      
+    internal_refactor:
+      risk_level: "LOW"
+      deployment_window: "normal"
+      
+    security_fix:
+      risk_level: "HIGH"
+      priority: "urgent"
+      deployment_window: "immediate"
+
+# Testing Strategy
+testing_strategy:
+  unit_tests:
+    required_for: ["HIGH", "CRITICAL"]
+    timeout: "5m"
+    
+  integration_tests:
+    required_for: ["MEDIUM", "HIGH", "CRITICAL"]
+    timeout: "15m"
+    
+  e2e_tests:
+    required_for: ["CRITICAL"]
+    timeout: "30m"
+    
+  performance_tests:
+    required_for: ["api_change", "database_schema"]
+    timeout: "20m"
+
+# Deployment Strategy
+deployment:
+  # Service deployment order based on dependencies
+  order:
+    1: ["database"]
+    2: ["shared"]
+    3: ["user-service", "catalog-service", "payment-service"]
+    4: ["cart-service", "chatbot-service"]
+    5: ["order-service"]
+    6: ["ui-service"]
+    
+  # Risk-based deployment windows
+  windows:
+    LOW: "anytime"
+    MEDIUM: "business_hours"
+    HIGH: "maintenance_window"
+    CRITICAL: "scheduled_maintenance"
+    
+  # Rollback strategy
+  rollback:
+    automatic_triggers:
+      - error_rate > 5%
+      - response_time > 2s
+      - availability < 99%
+    manual_approval_required: ["CRITICAL", "HIGH"]
+
+# Monitoring and Alerting
+monitoring:
+  metrics:
+    - service_health
+    - response_time
+    - error_rate
+    - throughput
+    - resource_utilization
+    
+  alerts:
+    critical:
+      - payment_service_down
+      - database_connection_failed
+      - high_error_rate
+    warning:
+      - slow_response_time
+      - high_cpu_usage
+      - memory_leak_detected
+
+# Notification Settings
+notifications:
+  channels:
+    slack: "#dev-alerts"
+    email: "dev-team@company.com"
+    
+  triggers:
+    CRITICAL: ["slack", "email", "pager"]
+    HIGH: ["slack", "email"]
+    MEDIUM: ["slack"]
+    LOW: []

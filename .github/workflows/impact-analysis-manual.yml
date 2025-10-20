@@ -1,0 +1,274 @@
+name: Manual Impact Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Service to analyze (ui-service, catalog-service, etc.)'
+        required: true
+        type: choice
+        options:
+          - ui-service
+          - catalog-service
+          - cart-service
+          - order-service
+          - payment-service
+          - user-service
+          - chatbot-service
+          - database
+          - shared
+      change_type:
+        description: 'Type of change'
+        required: true
+        type: choice
+        options:
+          - api-change
+          - database-schema
+          - configuration
+          - dependency-update
+          - security-fix
+          - performance-optimization
+      impact_scope:
+        description: 'Expected impact scope'
+        required: false
+        type: choice
+        default: 'unknown'
+        options:
+          - breaking-change
+          - backward-compatible
+          - internal-only
+          - unknown
+
+jobs:
+  manual-impact-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Amazon Q Developer Manual Impact Analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const serviceName = '${{ github.event.inputs.service_name }}';
+            const changeType = '${{ github.event.inputs.change_type }}';
+            const impactScope = '${{ github.event.inputs.impact_scope }}';
+            
+            // Service dependency matrix
+            const dependencies = {
+              'ui-service': {
+                depends_on: ['catalog-service', 'cart-service', 'order-service', 'user-service', 'chatbot-service'],
+                consumed_by: [],
+                criticality: 'HIGH',
+                user_facing: true
+              },
+              'catalog-service': {
+                depends_on: ['database'],
+                consumed_by: ['ui-service', 'cart-service', 'order-service'],
+                criticality: 'HIGH',
+                user_facing: false
+              },
+              'cart-service': {
+                depends_on: ['database', 'catalog-service', 'user-service'],
+                consumed_by: ['ui-service', 'order-service'],
+                criticality: 'HIGH',
+                user_facing: false
+              },
+              'order-service': {
+                depends_on: ['database', 'cart-service', 'payment-service', 'catalog-service'],
+                consumed_by: ['ui-service'],
+                criticality: 'CRITICAL',
+                user_facing: false
+              },
+              'payment-service': {
+                depends_on: ['database'],
+                consumed_by: ['order-service'],
+                criticality: 'CRITICAL',
+                user_facing: false
+              },
+              'user-service': {
+                depends_on: ['database', 'cognito'],
+                consumed_by: ['ui-service', 'cart-service', 'order-service'],
+                criticality: 'HIGH',
+                user_facing: false
+              },
+              'chatbot-service': {
+                depends_on: ['database'],
+                consumed_by: ['ui-service'],
+                criticality: 'MEDIUM',
+                user_facing: false
+              },
+              'database': {
+                depends_on: [],
+                consumed_by: ['catalog-service', 'cart-service', 'order-service', 'payment-service', 'user-service', 'chatbot-service'],
+                criticality: 'CRITICAL',
+                user_facing: false
+              },
+              'shared': {
+                depends_on: [],
+                consumed_by: ['ui-service', 'catalog-service', 'cart-service', 'order-service', 'payment-service', 'user-service', 'chatbot-service'],
+                criticality: 'HIGH',
+                user_facing: false
+              }
+            };
+
+            function analyzeManualImpact(service, changeType, scope) {
+              const serviceInfo = dependencies[service];
+              const analysis = {
+                service: service,
+                changeType: changeType,
+                scope: scope,
+                riskLevel: 'LOW',
+                affectedServices: [],
+                testingStrategy: [],
+                deploymentPlan: [],
+                rollbackPlan: [],
+                monitoringPoints: []
+              };
+
+              // Determine risk level
+              if (serviceInfo.criticality === 'CRITICAL' || changeType === 'database-schema' || scope === 'breaking-change') {
+                analysis.riskLevel = 'CRITICAL';
+              } else if (serviceInfo.criticality === 'HIGH' || changeType === 'api-change') {
+                analysis.riskLevel = 'HIGH';
+              } else if (changeType === 'security-fix' || serviceInfo.user_facing) {
+                analysis.riskLevel = 'MEDIUM';
+              }
+
+              // Find affected services
+              if (scope === 'breaking-change' || changeType === 'api-change') {
+                analysis.affectedServices = serviceInfo.consumed_by.map(s => ({
+                  name: s,
+                  impact: 'API contract change may break integration',
+                  action: 'Update integration code and test thoroughly'
+                }));
+              }
+
+              if (changeType === 'database-schema') {
+                analysis.affectedServices = serviceInfo.consumed_by.map(s => ({
+                  name: s,
+                  impact: 'Database schema change affects data access',
+                  action: 'Update queries and test data operations'
+                }));
+              }
+
+              // Generate testing strategy
+              analysis.testingStrategy = [
+                {
+                  type: 'Unit Tests',
+                  target: service,
+                  priority: 'HIGH',
+                  description: `Test ${service} functionality directly`
+                }
+              ];
+
+              if (analysis.affectedServices.length > 0) {
+                analysis.testingStrategy.push({
+                  type: 'Integration Tests',
+                  target: 'All affected services',
+                  priority: 'HIGH',
+                  description: 'Test service-to-service communication'
+                });
+              }
+
+              if (analysis.riskLevel === 'CRITICAL') {
+                analysis.testingStrategy.push({
+                  type: 'End-to-End Tests',
+                  target: 'Complete user journeys',
+                  priority: 'CRITICAL',
+                  description: 'Full system validation'
+                });
+              }
+
+              // Generate deployment plan
+              if (changeType === 'database-schema') {
+                analysis.deploymentPlan = [
+                  'Run database migration scripts',
+                  'Deploy backend services in dependency order',
+                  'Deploy frontend services',
+                  'Verify all services are healthy'
+                ];
+              } else {
+                analysis.deploymentPlan = [
+                  `Deploy ${service}`,
+                  'Verify service health',
+                  'Deploy dependent services if needed',
+                  'Run smoke tests'
+                ];
+              }
+
+              // Generate rollback plan
+              analysis.rollbackPlan = [
+                'Monitor service metrics for 15 minutes post-deployment',
+                'Check error rates and response times',
+                'If issues detected: rollback to previous version',
+                'Notify team and investigate issues'
+              ];
+
+              // Generate monitoring points
+              analysis.monitoringPoints = [
+                `${service} response time and error rate`,
+                `${service} resource utilization`,
+                'Database connection pool status',
+                'Inter-service communication health'
+              ];
+
+              if (serviceInfo.user_facing) {
+                analysis.monitoringPoints.push('User experience metrics');
+              }
+
+              return analysis;
+            }
+
+            const analysis = analyzeManualImpact(serviceName, changeType, impactScope);
+
+            // Create detailed report
+            let report = `# 🔍 Amazon Q Developer Manual Impact Analysis\n\n`;
+            report += `**Service:** ${analysis.service}\n`;
+            report += `**Change Type:** ${analysis.changeType}\n`;
+            report += `**Scope:** ${analysis.scope}\n`;
+            report += `**Risk Level:** ${analysis.riskLevel}\n\n`;
+
+            if (analysis.affectedServices.length > 0) {
+              report += `## 🎯 Affected Services\n\n`;
+              analysis.affectedServices.forEach(service => {
+                report += `### ${service.name}\n`;
+                report += `- **Impact:** ${service.impact}\n`;
+                report += `- **Action Required:** ${service.action}\n\n`;
+              });
+            }
+
+            report += `## 🧪 Testing Strategy\n\n`;
+            analysis.testingStrategy.forEach((test, index) => {
+              report += `${index + 1}. **${test.type}** (${test.priority})\n`;
+              report += `   - Target: ${test.target}\n`;
+              report += `   - Description: ${test.description}\n\n`;
+            });
+
+            report += `## 📦 Deployment Plan\n\n`;
+            analysis.deploymentPlan.forEach((step, index) => {
+              report += `${index + 1}. ${step}\n`;
+            });
+
+            report += `\n## 🔄 Rollback Plan\n\n`;
+            analysis.rollbackPlan.forEach((step, index) => {
+              report += `${index + 1}. ${step}\n`;
+            });
+
+            report += `\n## 📊 Monitoring Points\n\n`;
+            analysis.monitoringPoints.forEach(point => {
+              report += `- ${point}\n`;
+            });
+
+            report += `\n---\n*Manual analysis performed by Amazon Q Developer at ${new Date().toISOString()}*`;
+
+            // Create an issue with the analysis
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Impact Analysis: ${serviceName} - ${changeType}`,
+              body: report,
+              labels: ['impact-analysis', 'amazon-q', serviceName, changeType]
+            });
+
+            console.log('Manual impact analysis completed and issue created');

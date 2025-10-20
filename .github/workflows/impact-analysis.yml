@@ -1,0 +1,396 @@
+name: Amazon Q Developer Impact Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to analyze'
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  impact-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            services/**/*.js
+            services/**/*.json
+            shared/**/*.js
+            database/**/*.sql
+            .github/**/*.yml
+
+      - name: Amazon Q Developer Impact Analysis
+        id: impact-analysis
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Get changed files
+            const changedFiles = '${{ steps.changed-files.outputs.all_changed_files }}'.split(' ').filter(f => f);
+            
+            console.log('Analyzing impact for files:', changedFiles);
+            
+            // Microservices architecture mapping
+            const serviceMap = {
+              'services/ui-service': {
+                name: 'UI Service',
+                port: 3000,
+                dependencies: ['catalog-service', 'cart-service', 'order-service', 'user-service', 'chatbot-service'],
+                consumers: [],
+                criticality: 'HIGH',
+                type: 'frontend'
+              },
+              'services/catalog-service': {
+                name: 'Catalog Service', 
+                port: 3001,
+                dependencies: ['database'],
+                consumers: ['ui-service', 'cart-service', 'order-service'],
+                criticality: 'HIGH',
+                type: 'core-api'
+              },
+              'services/cart-service': {
+                name: 'Cart Service',
+                port: 3002, 
+                dependencies: ['database', 'catalog-service', 'user-service'],
+                consumers: ['ui-service', 'order-service'],
+                criticality: 'HIGH',
+                type: 'core-api'
+              },
+              'services/order-service': {
+                name: 'Order Service',
+                port: 3003,
+                dependencies: ['database', 'cart-service', 'payment-service', 'catalog-service'],
+                consumers: ['ui-service'],
+                criticality: 'CRITICAL',
+                type: 'business-logic'
+              },
+              'services/payment-service': {
+                name: 'Payment Service',
+                port: 3004,
+                dependencies: ['database'],
+                consumers: ['order-service'],
+                criticality: 'CRITICAL',
+                type: 'financial'
+              },
+              'services/user-service': {
+                name: 'User Service',
+                port: 3005,
+                dependencies: ['database', 'cognito'],
+                consumers: ['ui-service', 'cart-service', 'order-service'],
+                criticality: 'HIGH',
+                type: 'identity'
+              },
+              'services/chatbot-service': {
+                name: 'Chatbot Service',
+                port: 3006,
+                dependencies: ['database'],
+                consumers: ['ui-service'],
+                criticality: 'MEDIUM',
+                type: 'support'
+              }
+            };
+
+            // Amazon Q Developer Impact Analysis Logic
+            function analyzeImpact(changedFiles, serviceMap) {
+              const impact = {
+                directlyAffected: [],
+                indirectlyAffected: [],
+                testingRequired: [],
+                riskAssessment: 'LOW',
+                recommendations: [],
+                deploymentOrder: []
+              };
+
+              for (const file of changedFiles) {
+                // Determine which service is affected
+                const serviceKey = Object.keys(serviceMap).find(key => file.startsWith(key));
+                
+                if (serviceKey) {
+                  const service = serviceMap[serviceKey];
+                  
+                  // Direct impact
+                  if (!impact.directlyAffected.find(s => s.name === service.name)) {
+                    impact.directlyAffected.push({
+                      ...service,
+                      changedFiles: [file],
+                      changeType: determineChangeType(file)
+                    });
+                  }
+
+                  // Indirect impact - services that depend on this service
+                  Object.values(serviceMap).forEach(otherService => {
+                    if (otherService.dependencies.includes(service.name.toLowerCase().replace(' ', '-')) ||
+                        otherService.dependencies.includes(serviceKey.split('/')[1])) {
+                      if (!impact.indirectlyAffected.find(s => s.name === otherService.name)) {
+                        impact.indirectlyAffected.push({
+                          ...otherService,
+                          impactReason: `Depends on ${service.name}`,
+                          impactType: 'dependency'
+                        });
+                      }
+                    }
+                  });
+
+                  // Consumer impact - services that consume this service
+                  service.consumers.forEach(consumerName => {
+                    const consumer = Object.values(serviceMap).find(s => 
+                      s.name.toLowerCase().replace(' ', '-') === consumerName ||
+                      consumerName.includes(s.name.toLowerCase().replace(' service', ''))
+                    );
+                    
+                    if (consumer && !impact.indirectlyAffected.find(s => s.name === consumer.name)) {
+                      impact.indirectlyAffected.push({
+                        ...consumer,
+                        impactReason: `Consumes ${service.name}`,
+                        impactType: 'consumer'
+                      });
+                    }
+                  });
+
+                  // Risk assessment
+                  if (service.criticality === 'CRITICAL') {
+                    impact.riskAssessment = 'CRITICAL';
+                  } else if (service.criticality === 'HIGH' && impact.riskAssessment !== 'CRITICAL') {
+                    impact.riskAssessment = 'HIGH';
+                  } else if (service.criticality === 'MEDIUM' && impact.riskAssessment === 'LOW') {
+                    impact.riskAssessment = 'MEDIUM';
+                  }
+                }
+
+                // Database changes affect all services
+                if (file.includes('database/') || file.includes('schema.sql')) {
+                  impact.riskAssessment = 'CRITICAL';
+                  impact.indirectlyAffected = Object.values(serviceMap).map(service => ({
+                    ...service,
+                    impactReason: 'Database schema change affects all services',
+                    impactType: 'database'
+                  }));
+                }
+
+                // Shared code changes
+                if (file.includes('shared/')) {
+                  impact.riskAssessment = 'HIGH';
+                  impact.indirectlyAffected = Object.values(serviceMap).map(service => ({
+                    ...service,
+                    impactReason: 'Shared code change affects all services',
+                    impactType: 'shared-dependency'
+                  }));
+                }
+              }
+
+              // Generate testing recommendations
+              impact.testingRequired = generateTestingPlan(impact);
+              
+              // Generate deployment recommendations
+              impact.deploymentOrder = generateDeploymentOrder(impact);
+              
+              // Generate Amazon Q recommendations
+              impact.recommendations = generateRecommendations(impact);
+
+              return impact;
+            }
+
+            function determineChangeType(file) {
+              if (file.includes('package.json')) return 'dependency';
+              if (file.includes('server.js')) return 'core-logic';
+              if (file.includes('.sql')) return 'database';
+              if (file.includes('config')) return 'configuration';
+              return 'code';
+            }
+
+            function generateTestingPlan(impact) {
+              const tests = [];
+              
+              // Direct service tests
+              impact.directlyAffected.forEach(service => {
+                tests.push({
+                  type: 'unit',
+                  target: service.name,
+                  priority: 'HIGH',
+                  reason: 'Direct code changes'
+                });
+                
+                tests.push({
+                  type: 'integration',
+                  target: service.name,
+                  priority: 'HIGH', 
+                  reason: 'API contract validation'
+                });
+              });
+
+              // Consumer integration tests
+              impact.indirectlyAffected.forEach(service => {
+                if (service.impactType === 'consumer') {
+                  tests.push({
+                    type: 'integration',
+                    target: service.name,
+                    priority: 'MEDIUM',
+                    reason: `Integration with modified ${service.impactReason}`
+                  });
+                }
+              });
+
+              // End-to-end tests for critical changes
+              if (impact.riskAssessment === 'CRITICAL') {
+                tests.push({
+                  type: 'e2e',
+                  target: 'Full user journey',
+                  priority: 'CRITICAL',
+                  reason: 'Critical system changes require full validation'
+                });
+              }
+
+              return tests;
+            }
+
+            function generateDeploymentOrder(impact) {
+              const order = [];
+              
+              // Database first
+              if (impact.directlyAffected.some(s => s.changeType === 'database')) {
+                order.push('Database Migration');
+              }
+              
+              // Shared components
+              if (impact.indirectlyAffected.some(s => s.impactType === 'shared-dependency')) {
+                order.push('Shared Components');
+              }
+              
+              // Core services (payment, user, catalog)
+              const coreServices = impact.directlyAffected.filter(s => 
+                ['Payment Service', 'User Service', 'Catalog Service'].includes(s.name)
+              );
+              order.push(...coreServices.map(s => s.name));
+              
+              // Business logic services
+              const businessServices = impact.directlyAffected.filter(s => 
+                s.type === 'business-logic' && !coreServices.includes(s)
+              );
+              order.push(...businessServices.map(s => s.name));
+              
+              // Frontend last
+              const frontendServices = impact.directlyAffected.filter(s => s.type === 'frontend');
+              order.push(...frontendServices.map(s => s.name));
+              
+              return order;
+            }
+
+            function generateRecommendations(impact) {
+              const recommendations = [];
+              
+              if (impact.riskAssessment === 'CRITICAL') {
+                recommendations.push('🚨 **CRITICAL IMPACT**: Deploy during maintenance window');
+                recommendations.push('📋 **Required**: Full regression testing before deployment');
+                recommendations.push('🔄 **Rollback Plan**: Prepare immediate rollback strategy');
+              }
+              
+              if (impact.indirectlyAffected.length > 3) {
+                recommendations.push('⚠️ **High Coupling**: Consider breaking changes into smaller PRs');
+              }
+              
+              if (impact.directlyAffected.some(s => s.type === 'financial')) {
+                recommendations.push('💳 **Financial Impact**: Extra validation for payment flows required');
+              }
+              
+              recommendations.push(`🧪 **Testing**: ${impact.testingRequired.length} test suites recommended`);
+              recommendations.push(`📦 **Deployment**: ${impact.deploymentOrder.length} services in sequence`);
+              
+              return recommendations;
+            }
+
+            // Perform the analysis
+            const analysisResult = analyzeImpact(changedFiles, serviceMap);
+            
+            // Create impact analysis report
+            let report = `## 🔍 Amazon Q Developer Impact Analysis\n\n`;
+            
+            // Risk Assessment
+            const riskEmoji = {
+              'LOW': '🟢',
+              'MEDIUM': '🟡', 
+              'HIGH': '🟠',
+              'CRITICAL': '🔴'
+            };
+            
+            report += `### ${riskEmoji[analysisResult.riskAssessment]} Risk Assessment: **${analysisResult.riskAssessment}**\n\n`;
+            
+            // Directly Affected Services
+            if (analysisResult.directlyAffected.length > 0) {
+              report += `### 🎯 Directly Affected Services (${analysisResult.directlyAffected.length})\n\n`;
+              analysisResult.directlyAffected.forEach(service => {
+                report += `- **${service.name}** (Port ${service.port})\n`;
+                report += `  - Criticality: ${service.criticality}\n`;
+                report += `  - Type: ${service.type}\n`;
+                report += `  - Change Type: ${service.changeType}\n\n`;
+              });
+            }
+            
+            // Indirectly Affected Services  
+            if (analysisResult.indirectlyAffected.length > 0) {
+              report += `### 🔗 Indirectly Affected Services (${analysisResult.indirectlyAffected.length})\n\n`;
+              analysisResult.indirectlyAffected.forEach(service => {
+                report += `- **${service.name}**: ${service.impactReason}\n`;
+              });
+              report += `\n`;
+            }
+            
+            // Testing Plan
+            if (analysisResult.testingRequired.length > 0) {
+              report += `### 🧪 Recommended Testing\n\n`;
+              analysisResult.testingRequired.forEach(test => {
+                const priorityEmoji = test.priority === 'CRITICAL' ? '🔴' : test.priority === 'HIGH' ? '🟠' : '🟡';
+                report += `- ${priorityEmoji} **${test.type.toUpperCase()}**: ${test.target} - ${test.reason}\n`;
+              });
+              report += `\n`;
+            }
+            
+            // Deployment Order
+            if (analysisResult.deploymentOrder.length > 0) {
+              report += `### 📦 Recommended Deployment Order\n\n`;
+              analysisResult.deploymentOrder.forEach((item, index) => {
+                report += `${index + 1}. ${item}\n`;
+              });
+              report += `\n`;
+            }
+            
+            // Recommendations
+            if (analysisResult.recommendations.length > 0) {
+              report += `### 💡 Amazon Q Developer Recommendations\n\n`;
+              analysisResult.recommendations.forEach(rec => {
+                report += `${rec}\n`;
+              });
+            }
+            
+            report += `\n---\n*Analysis performed by Amazon Q Developer at ${new Date().toISOString()}*`;
+            
+            // Post the analysis as a comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
+            
+            console.log('Impact analysis completed and posted to PR');
+            
+            return analysisResult;
